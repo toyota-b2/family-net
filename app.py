@@ -129,11 +129,8 @@ def mutate(fn):
     with lock:
         fn()
         save()
-        try:
-            push()
-            return jsonify(ok=True)
-        except Exception as exc:
-            return jsonify(ok=False, error=f"Δεν μίλησα με το AdGuard Home: {exc}"), 502
+        push()
+        return jsonify(ok=True)
 
 
 @app.post("/api/block")
