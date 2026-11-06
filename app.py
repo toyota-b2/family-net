@@ -2,10 +2,8 @@ import os
 import requests
 from flask import Flask, jsonify, request
 
-# 1. Πρώτα ορίζεται το app
 app = Flask(__name__)
 
-# Εδώ η διεύθυνση του AdGuard στο Railway
 ADGUARD_URL = "https://adguard-production-d5a7.up.railway.app" 
 ADGUARD_USER = ""  
 ADGUARD_PASS = ""  
@@ -78,25 +76,3 @@ def unblock():
         domain = req_data.get("domain")
         if domain:
             rule = f"||{domain}^"
-            requests.post(
-                f"{ADGUARD_URL}/control/filtering/remove_user_rule",
-                json={"rule": rule},
-                auth=(ADGUARD_USER, ADGUARD_PASS),
-                timeout=3
-            )
-            
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/pause", methods=["POST"])
-def pause():
-    try:
-        requests.post(
-            f"{ADGUARD_URL}/control/filtering/config",
-            json={"enabled": False},
-            auth=(ADGUARD_USER, ADGUARD_PASS),
-            timeout=3
-        )
-        return jsonify({"ok": True})
-    except Exception as e:
