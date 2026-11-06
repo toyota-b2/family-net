@@ -3,7 +3,6 @@ import json, os, re, threading, time, uuid
 import requests
 from flask import Flask, jsonify, request, send_file, Response
 
-# Διορθωμένο ώστε να προσθέτει αυτόματα http:// αν δεν υπάρχει
 _raw_adguard = os.environ.get("ADGUARD_URL", "http://adguard:3000").rstrip("/")
 if not _raw_adguard.startswith(("http://", "https://")):
     _raw_adguard = f"http://{_raw_adguard}"
@@ -132,9 +131,9 @@ def mutate(fn):
         save()
         try:
             push()
-            return jsonify(ok=True)
         except Exception as exc:
             return jsonify(ok=False, error=f"Δεν μίλησα με το AdGuard Home: {exc}"), 502
+        return jsonify(ok=True)
 
 
 @app.post("/api/block")
