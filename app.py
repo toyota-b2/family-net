@@ -1,7 +1,7 @@
 import base64
 import os
 import requests
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
@@ -31,16 +31,11 @@ def get_adguard_status():
   return response.json()
 
 
-def mutate_adguard(func):
-  """Βοηθητική συνάρτηση για αλλαγές (block/unblock) στο AdGuard"""
-  url = f"{ADGUARD_URL}/control/filtering/status"
-  # Εδώ εκτελείται η εκάστοτε ενέργεια
-  return func(url)
-
-
 @app.route("/")
 def index():
-  return render_template("index.html")
+  # Διαβάζει το index.html απευθείας από τον φάκελο, χωρίς ανάγκη για templates folder
+  with open("index.html", "r", encoding="utf-8") as f:
+    return f.read()
 
 
 @app.route("/api/state")
@@ -55,14 +50,10 @@ def api_state():
 @app.route("/api/block", methods=["POST"])
 def block():
   try:
-    # Παράδειγμα κλήσης για τροποποίηση φίλτρων
-    def f(url):
-      # Εδώ μπαίνει η λογική του block/unblock που είχες
-      st = requests.get(url, headers=ADGUARD_HEADERS, timeout=10)
-      st.raise_for_status()
-      return jsonify({"success": True})
-
-    return mutate_adguard(f)
+    url = f"{ADGUARD_URL}/control/filtering/status"
+    st = requests.get(url, headers=ADGUARD_HEADERS, timeout=10)
+    st.raise_for_status()
+    return jsonify({"success": True})
   except Exception as e:
     return jsonify({"success": False, "error": str(e)}), 500
 
