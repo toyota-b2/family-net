@@ -30,27 +30,17 @@ def api_state():
         res = requests.get(f"{ADGUARD_URL}/control/filtering/status", auth=adguard_auth, timeout=10)
         res.raise_for_status()
         data = res.json()
+        print("ADGUARD RESPONSE:", data)  # Τυπώνει στα logs τι στέλνει το AdGuard
         
-        user_rules = data.get("user_rules", [])
-        formatted_blocked = []
-        
-        if isinstance(user_rules, list):
-            for rule in user_rules:
-                if isinstance(rule, str):
-                    if rule.startswith("||") and rule.endswith("^"):
-                        domain = rule[2:-1]
-                        formatted_blocked.append({"domain": domain})
-                    elif rule and not rule.startswith("!"):
-                        formatted_blocked.append({"domain": rule})
-
         state_data = {
-            "blocked": formatted_blocked,
+            "blocked": [],
             "exceptions": [],
             "clients": []
         }
         
         return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
     except Exception as e:
+        print("API STATE ERROR:", str(e))
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/block", methods=["POST"])
