@@ -147,4 +147,51 @@ def block():
         have = {b["domain"] for b in state["blocked"]}
         for d in domains:
             if d not in have:
-                state["blocked"].append
+                state["blocked"].append({"domain": d, "paused_until": None})
+    return mutate(f)
+
+
+@app.post("/api/unblock")
+def unblock():
+    d = request.json["domain"]
+    return mutate(lambda: state.update(blocked=[b for b in state["blocked"] if b["domain"] != d]))
+
+
+@app.post("/api/pause")
+def pause():
+    j = request.json
+    until = time.time() + j["minutes"] * 60 if j.get("minutes") else None
+    def f():
+        for b in state["blocked"]:
+            if b["domain"] in j["domains"]:
+                b["paused_until"] = until
+    return mutate(f)
+
+
+@app.post("/api/allow")
+def allow():
+    j = request.json
+    client = j.get("client", "").strip()
+    client = client if re.fullmatch(r"[\w.:/-]+", client) else None
+    if not client:
+        return jsonify(ok=False, error="Βάλε όνομα ή IP συσκευής"), 400
+    until = time.time() + j["minutes"] * 60 if j.get("minutes") else None
+    domains = [b["domain"] for b in state["blocked"] if b["domain"] in j["domains"]]
+    def f():
+        for d in domains:
+            state["exceptions"].append({"id": uuid.uuid4().hex[:8], "domain": d, "client": client, "until": until})
+    return mutate(f)
+
+
+@app.post("/api/disallow")
+def disallow():
+    i = request.json["id"]
+    return mutate(lambda: state.update(exceptions=[e for e in state["exceptions"] if e["id"] != i]))
+
+
+if __name__ == "__main__":
+    if not APP_PASS:
+        raise SystemExit("Όρισε APP_PASS (ο κωδικός του app).")
+    load()
+    threading.Thread(target=housekeeping, daemon=True).start()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
