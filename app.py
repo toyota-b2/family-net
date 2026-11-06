@@ -27,12 +27,16 @@ def index():
 @app.route("/api/state")
 def api_state():
     try:
-        # Παίρνουμε τους user rules απευθείας από το σωστό endpoint του AdGuard
-        res = requests.get(f"{ADGUARD_URL}/control/filtering/rules", auth=adguard_auth, timeout=10)
+        # Χτυπάμε το status που ξέρουμε ότι δίνει 200 OK, 
+        # και ταυτόχρονα παίρνουμε τα user rules με ασφαλή έλεγχο
+        res = requests.get(f"{ADGUARD_URL}/control/filtering/status", auth=adguard_auth, timeout=10)
         res.raise_for_status()
-        user_rules = res.json()
+        data = res.json()
         
+        # Το AdGuard συνήθως βάζει τα custom rules μέσα στο 'user_rules' του status!
+        user_rules = data.get("user_rules", [])
         formatted_blocked = []
+        
         if isinstance(user_rules, list):
             for rule in user_rules:
                 if isinstance(rule, str):
@@ -50,7 +54,7 @@ def api_state():
         
         return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
     except Exception as e:
-        print("API STATE ERROR:", str(e))
+        print("EXACT API STATE ERROR:", str(e))
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/block", methods=["POST"])
@@ -80,21 +84,4 @@ def block():
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/unblock", methods=["POST"])
-def unblock():
-    try:
-        req_data = request.get_json() or {}
-        domain = req_data.get("domain")
-        if domain:
-            rule = f"||{domain}^"
-            requests.post(
-                f"{ADGUARD_URL}/control/filtering/remove_url",
-                auth=adguard_auth,
-                json={"url": rule},
-                timeout=10
-            )
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+def
