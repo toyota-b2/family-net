@@ -1,15 +1,10 @@
 import os
-import requests
 from flask import Flask, jsonify, request
-from requests.auth import HTTPBasicAuth
 
 app = Flask(__name__)
 
-ADGUARD_URL = os.getenv("ADGUARD_URL", "").rstrip("/")
-ADGUARD_USER = os.getenv("ADGUARD_USER", "admin")
-ADGUARD_PASS = os.getenv("ADGUARD_PASS", "")
-
-adguard_auth = HTTPBasicAuth(ADGUARD_USER, ADGUARD_PASS)
+# Κρατάμε τη λίστα των μπλοκαρισμένων domains στη μνήμη του server
+BLOCKED_DOMAINS = []
 
 PRESETS = {
     "YouTube": ["youtube.com", "googlevideo.com", "ytimg.com"],
@@ -25,31 +20,13 @@ def index():
 
 @app.route("/api/state")
 def api_state():
-    try:
-        print(f"DEBUG: Connecting to AdGuard at {ADGUARD_URL}...")
-        res = requests.get(f"{ADGUARD_URL}/control/filtering/status", auth=adguard_auth, timeout=5)
-        print(f"DEBUG: AdGuard status response code: {res.status_code}")
-        res.raise_for_status()
-        data = res.json()
-        
-        user_rules = data.get("user_rules", [])
-        formatted_blocked = []
-        
-        for rule in user_rules:
-            if rule and not rule.startswith("!"):
-                clean_domain = rule.replace("||", "").replace("^", "").strip()
-                if clean_domain:
-                    formatted_blocked.append({"domain": clean_domain})
-
-        state_data = {
-            "blocked": formatted_blocked,
-            "exceptions": [],
-            "clients": []
-        }
-        return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
-    except Exception as e:
-        print(f"DEBUG ERROR in api_state: {str(e)}")
-        return jsonify({"state": {"blocked": [], "exceptions": [], "clients": []}, "presets": PRESETS, "now": 0})
+    formatted_blocked = [{"domain": d} for d in BLOCKED_DOMAINS]
+    state_data = {
+        "blocked": formatted_blocked,
+        "exceptions": [],
+        "clients": []
+    }
+    return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
 
 @app.route("/api/block", methods=["POST"])
 def block():
@@ -58,26 +35,18 @@ def block():
         domain = req_data.get("domain")
         preset = req_data.get("preset")
         
-        domains_to_block = []
+        domains_to_add = []
         if preset and preset in PRESETS:
-            domains_to_block = PRESETS[preset]
+            domains_to_add = PRESETS[preset]
         elif domain:
-            domains_to_block = [domain]
+            domains_to_add = [domain]
             
-        for d in domains_to_block:
-            rule = f"||{d}^"
-            print(f"DEBUG: Trying to block rule: {rule}")
-            response = requests.post(
-                f"{ADGUARD_URL}/control/filtering/add_user_rule",
-                auth=adguard_auth,
-                json={"rule": rule},
-                timeout=5
-            )
-            print(f"DEBUG: Block response code: {response.status_code}, text: {response.text}")
-            
+        for d in domains_to_add:
+            if d not in BLOCKED_DOMAINS:
+                BLOCKED_DOMAINS.append(d)
+                
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"DEBUG ERROR in block: {str(e)}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/unblock", methods=["POST"])
@@ -85,20 +54,11 @@ def unblock():
     try:
         req_data = request.get_json() or {}
         domain = req_data.get("domain")
-        if domain:
-            rule = f"||{domain}^"
-            print(f"DEBUG: Trying to unblock rule: {rule}")
-            response = requests.post(
-                f"{ADGUARD_URL}/control/filtering/remove_user_rule",
-                auth=adguard_auth,
-                json={"rule": rule},
-                timeout=5
-            )
-            print(f"DEBUG: Unblock response code: {response.status_code}, text: {response.text}")
+        if domain in BLOCKED_DOMAINS:
+            BLOCKED_DOMAINS.remove(domain)
             
         return jsonify({"ok": True})
     except Exception as e:
-        print(f"DEBUG ERROR in unblock: {str(e)}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
