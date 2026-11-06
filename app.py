@@ -26,8 +26,9 @@ def index():
 @app.route("/api/state")
 def api_state():
     try:
-        # Παίρνουμε το status του AdGuard που περιέχει τα user rules
+        print(f"DEBUG: Connecting to AdGuard at {ADGUARD_URL}...")
         res = requests.get(f"{ADGUARD_URL}/control/filtering/status", auth=adguard_auth, timeout=5)
+        print(f"DEBUG: AdGuard status response code: {res.status_code}")
         res.raise_for_status()
         data = res.json()
         
@@ -36,7 +37,6 @@ def api_state():
         
         for rule in user_rules:
             if rule and not rule.startswith("!"):
-                # Καθαρίζουμε το rule (π.χ. ||youtube.com^ -> youtube.com)
                 clean_domain = rule.replace("||", "").replace("^", "").strip()
                 if clean_domain:
                     formatted_blocked.append({"domain": clean_domain})
@@ -48,7 +48,7 @@ def api_state():
         }
         return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
     except Exception as e:
-        # Αν υπάρξει θέμα, γυρνάμε κενή λίστα για να μην κρασάρει η σελίδα
+        print(f"DEBUG ERROR in api_state: {str(e)}")
         return jsonify({"state": {"blocked": [], "exceptions": [], "clients": []}, "presets": PRESETS, "now": 0})
 
 @app.route("/api/block", methods=["POST"])
@@ -66,16 +66,18 @@ def block():
             
         for d in domains_to_block:
             rule = f"||{d}^"
-            # Σωστό endpoint για προσθήκη custom user rule στο AdGuard
-            requests.post(
+            print(f"DEBUG: Trying to block rule: {rule}")
+            response = requests.post(
                 f"{ADGUARD_URL}/control/filtering/add_user_rule",
                 auth=adguard_auth,
                 json={"rule": rule},
                 timeout=5
             )
+            print(f"DEBUG: Block response code: {response.status_code}, text: {response.text}")
             
         return jsonify({"ok": True})
     except Exception as e:
+        print(f"DEBUG ERROR in block: {str(e)}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 @app.route("/api/unblock", methods=["POST"])
@@ -85,15 +87,18 @@ def unblock():
         domain = req_data.get("domain")
         if domain:
             rule = f"||{domain}^"
-            # Σωστό endpoint για αφαίρεση custom user rule από το AdGuard
-            requests.post(
+            print(f"DEBUG: Trying to unblock rule: {rule}")
+            response = requests.post(
                 f"{ADGUARD_URL}/control/filtering/remove_user_rule",
                 auth=adguard_auth,
                 json={"rule": rule},
                 timeout=5
             )
+            print(f"DEBUG: Unblock response code: {response.status_code}, text: {response.text}")
+            
         return jsonify({"ok": True})
     except Exception as e:
+        print(f"DEBUG ERROR in unblock: {str(e)}")
         return jsonify({"ok": False, "error": str(e)}), 500
 
 if __name__ == "__main__":
