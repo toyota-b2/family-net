@@ -26,36 +26,12 @@ def index():
 
 @app.route("/api/state")
 def api_state():
-    try:
-        # Χτυπάμε το status που ξέρουμε ότι δίνει 200 OK, 
-        # και ταυτόχρονα παίρνουμε τα user rules με ασφαλή έλεγχο
-        res = requests.get(f"{ADGUARD_URL}/control/filtering/status", auth=adguard_auth, timeout=10)
-        res.raise_for_status()
-        data = res.json()
-        
-        # Το AdGuard συνήθως βάζει τα custom rules μέσα στο 'user_rules' του status!
-        user_rules = data.get("user_rules", [])
-        formatted_blocked = []
-        
-        if isinstance(user_rules, list):
-            for rule in user_rules:
-                if isinstance(rule, str):
-                    if rule.startswith("||") and rule.endswith("^"):
-                        domain = rule[2:-1]
-                        formatted_blocked.append({"domain": domain})
-                    elif rule and not rule.startswith("!"):
-                        formatted_blocked.append({"domain": rule})
-
-        state_data = {
-            "blocked": formatted_blocked,
-            "exceptions": [],
-            "clients": []
-        }
-        
-        return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
-    except Exception as e:
-        print("EXACT API STATE ERROR:", str(e))
-        return jsonify({"ok": False, "error": str(e)}), 500
+    state_data = {
+        "blocked": [],
+        "exceptions": [],
+        "clients": []
+    }
+    return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
 
 @app.route("/api/block", methods=["POST"])
 def block():
@@ -74,14 +50,4 @@ def block():
             rule = f"||{d}^"
             requests.post(
                 f"{ADGUARD_URL}/control/filtering/add_url",
-                auth=adguard_auth,
-                json={"url": rule, "name": d},
-                timeout=10
-            )
-            
-        return jsonify({"ok": True})
-    except Exception as e:
-        return jsonify({"ok": False, "error": str(e)}), 500
-
-@app.route("/api/unblock", methods=["POST"])
-def
+                auth=adguard_
