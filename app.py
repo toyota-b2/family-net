@@ -47,7 +47,6 @@ def block():
             
         for d in domains_to_block:
             rule = f"||{d}^"
-            # Σωστό endpoint του AdGuard για user custom rules
             requests.post(
                 f"{ADGUARD_URL}/control/filtering/add_url",
                 auth=adguard_auth,
@@ -76,4 +75,5 @@ def unblock():
     except Exception as e:
         return jsonify({"ok": True})
 
-if __name__
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
