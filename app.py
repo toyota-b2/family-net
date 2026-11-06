@@ -27,13 +27,23 @@ def index():
 @app.route("/api/state")
 def api_state():
     try:
-        res = requests.get(f"{ADGUARD_URL}/control/filtering/status", auth=adguard_auth, timeout=10)
+        # Παίρνουμε τους user rules απευθείας από το σωστό endpoint του AdGuard
+        res = requests.get(f"{ADGUARD_URL}/control/filtering/rules", auth=adguard_auth, timeout=10)
         res.raise_for_status()
-        data = res.json()
-        print("ADGUARD RESPONSE:", data)  # Τυπώνει στα logs τι στέλνει το AdGuard
+        user_rules = res.json()
         
+        formatted_blocked = []
+        if isinstance(user_rules, list):
+            for rule in user_rules:
+                if isinstance(rule, str):
+                    if rule.startswith("||") and rule.endswith("^"):
+                        domain = rule[2:-1]
+                        formatted_blocked.append({"domain": domain})
+                    elif rule and not rule.startswith("!"):
+                        formatted_blocked.append({"domain": rule})
+
         state_data = {
-            "blocked": [],
+            "blocked": formatted_blocked,
             "exceptions": [],
             "clients": []
         }
