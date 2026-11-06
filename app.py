@@ -4,10 +4,10 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Εδώ βάζεις την τοπική διεύθυνση του AdGuard Home σου (π.χ. http://192.168.1.50:80)
-ADGUARD_URL = "http://192.168.1.X:80" 
-ADGUARD_USER = "admin"  # Το username σου στο AdGuard
-ADGUARD_PASS = "password" # Ο κωδικός σου στο AdGuard
+# Εδώ έχει περαστεί απευθείας η σωστή διεύθυνση του AdGuard στο Railway
+ADGUARD_URL = "https://adguard-production-d5a7.up.railway.app" 
+ADGUARD_USER = ""  # Αν έχεις βάλει username στο AdGuard σου, βάλε το εδώ
+ADGUARD_PASS = ""  # Αν έχεις βάλει password, βάλε το εδώ
 
 PRESETS = {
     "YouTube": ["youtube.com", "googlevideo.com", "ytimg.com"],
@@ -65,7 +65,7 @@ def block():
             rule = f"||{d}^"
             requests.post(
                 f"{ADGUARD_URL}/control/filtering/add_url",
-                json={"url": rule, "name": d}, # Ή add_user_rule ανάλογα με την έκδοση
+                json={"url": rule, "name": d}, 
                 auth=(ADGUARD_USER, ADGUARD_PASS),
                 timeout=3
             )
@@ -109,7 +109,7 @@ def pause():
 def resume():
     try:
         requests.post(
-            f"{ADGUARD_URL}/control/filtering/config",
+            f"{ADGUARD_URL},/control/filtering/config",
             json={"enabled": True},
             auth=(ADGUARD_USER, ADGUARD_PASS),
             timeout=3
