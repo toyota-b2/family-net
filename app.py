@@ -3,10 +3,8 @@ import requests
 from flask import Flask, jsonify, request
 from requests.auth import HTTPBasicAuth
 
-# Εδώ δημιουργείται η εφαρμογή Flask (αυτό έλειπε και χτύπαγε error)
 app = Flask(__name__)
 
-# Διαβάζουμε τις μεταβλητές περιβάλλοντος από το Railway
 APP_PASS = os.getenv("APP_PASS", "1234")
 ADGUARD_URL = os.getenv("ADGUARD_URL", "").rstrip("/")
 ADGUARD_USER = os.getenv("ADGUARD_USER", "admin")
@@ -14,7 +12,6 @@ ADGUARD_PASS = os.getenv("ADGUARD_PASS", "")
 
 adguard_auth = HTTPBasicAuth(ADGUARD_USER, ADGUARD_PASS)
 
-# Προεπιλεγμένες υπηρεσίες / presets
 PRESETS = {
     "YouTube": ["youtube.com", "googlevideo.com", "ytimg.com"],
     "TikTok": ["tiktok.com", "tiktokcdn.com", "ibytedtos.com"],
@@ -59,3 +56,45 @@ def api_state():
 @app.route("/api/block", methods=["POST"])
 def block():
     try:
+        req_data = request.get_json() or {}
+        domain = req_data.get("domain")
+        preset = req_data.get("preset")
+        
+        domains_to_block = []
+        if preset and preset in PRESETS:
+            domains_to_block = PRESETS[preset]
+        elif domain:
+            domains_to_block = [domain]
+            
+        for d in domains_to_block:
+            rule = f"||{d}^"
+            requests.post(
+                f"{ADGUARD_URL}/control/filtering/add_url",
+                auth=adguard_auth,
+                json={"url": rule, "name": d},
+                timeout=10
+            )
+            
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/unblock", methods=["POST"])
+def unblock():
+    try:
+        req_data = request.get_json() or {}
+        domain = req_data.get("domain")
+        if domain:
+            rule = f"||{domain}^"
+            requests.post(
+                f"{ADGUARD_URL}/control/filtering/remove_url",
+                auth=adguard_auth,
+                json={"url": rule},
+                timeout=10
+            )
+        return jsonify({"ok": True})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8080)
