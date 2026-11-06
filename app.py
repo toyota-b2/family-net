@@ -3,8 +3,8 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-# Κρατάμε τη λίστα των μπλοκαρισμένων domains στη μνήμη του server
 BLOCKED_DOMAINS = []
+is_paused = False
 
 PRESETS = {
     "YouTube": ["youtube.com", "googlevideo.com", "ytimg.com"],
@@ -24,7 +24,8 @@ def api_state():
     state_data = {
         "blocked": formatted_blocked,
         "exceptions": [],
-        "clients": []
+        "clients": [],
+        "paused": is_paused
     }
     return jsonify({"state": state_data, "presets": PRESETS, "now": 0})
 
@@ -60,6 +61,18 @@ def unblock():
         return jsonify({"ok": True})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.route("/api/pause", methods=["POST"])
+def pause():
+    global is_paused
+    is_paused = True
+    return jsonify({"ok": True})
+
+@app.route("/api/resume", methods=["POST"])
+def resume():
+    global is_paused
+    is_paused = False
+    return jsonify({"ok": True})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080)
