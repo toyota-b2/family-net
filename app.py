@@ -3,7 +3,12 @@ import json, os, re, threading, time, uuid
 import requests
 from flask import Flask, jsonify, request, send_file, Response
 
-ADGUARD_URL = os.environ.get("ADGUARD_URL", "http://adguard:3000").rstrip("/")
+# Διορθωμένο ώστε να προσθέτει αυτόματα http:// αν δεν υπάρχει
+_raw_adguard = os.environ.get("ADGUARD_URL", "http://adguard:3000").rstrip("/")
+if not _raw_adguard.startswith(("http://", "https://")):
+    _raw_adguard = f"http://{_raw_adguard}"
+ADGUARD_URL = _raw_adguard
+
 ADGUARD_AUTH = (os.environ.get("ADGUARD_USER", ""), os.environ.get("ADGUARD_PASS", ""))
 APP_USER = os.environ.get("APP_USER", "admin")
 APP_PASS = os.environ.get("APP_PASS", "")
@@ -110,83 +115,4 @@ def clients():
         j = requests.get(f"{ADGUARD_URL}/control/clients", auth=ADGUARD_AUTH, timeout=10).json()
         names = [c["name"] for c in j.get("clients") or []]
         names += [c.get("name") or c["ip"] for c in j.get("auto_clients") or []]
-        return sorted(set(names))
-    except Exception:
-        return []
-
-
-@app.get("/api/state")
-def get_state():
-    with lock:
-        return jsonify(state=state, presets=PRESETS, clients=clients(), now=time.time())
-
-
-def mutate(fn):
-    with lock:
-        fn()
-        save()
-        try:
-            push()
-            return jsonify(ok=True)
-        except Exception as exc:
-            return jsonify(ok=False, error=f"Δεν μίλησα με το AdGuard Home: {exc}"), 502
-
-
-@app.post("/api/block")
-def block():
-    j = request.json
-    domains = PRESETS.get(j.get("preset")) or [clean_domain(j.get("domain", ""))]
-    if not all(domains):
-        return jsonify(ok=False, error="Μη έγκυρο domain"), 400
-    def f():
-        have = {b["domain"] for b in state["blocked"]}
-        for d in domains:
-            if d not in have:
-                state["blocked"].append({"domain": d, "paused_until": None})
-    return mutate(f)
-
-
-@app.post("/api/unblock")
-def unblock():
-    d = request.json["domain"]
-    return mutate(lambda: state.update(blocked=[b for b in state["blocked"] if b["domain"] != d]))
-
-
-@app.post("/api/pause")
-def pause():
-    j = request.json
-    until = time.time() + j["minutes"] * 60 if j.get("minutes") else None
-    def f():
-        for b in state["blocked"]:
-            if b["domain"] in j["domains"]:
-                b["paused_until"] = until
-    return mutate(f)
-
-
-@app.post("/api/allow")
-def allow():
-    j = request.json
-    client = j.get("client", "").strip()
-    client = client if re.fullmatch(r"[\w.:/-]+", client) else None
-    if not client:
-        return jsonify(ok=False, error="Βάλε όνομα ή IP συσκευής"), 400
-    until = time.time() + j["minutes"] * 60 if j.get("minutes") else None
-    domains = [b["domain"] for b in state["blocked"] if b["domain"] in j["domains"]]
-    def f():
-        for d in domains:
-            state["exceptions"].append({"id": uuid.uuid4().hex[:8], "domain": d, "client": client, "until": until})
-    return mutate(f)
-
-
-@app.post("/api/disallow")
-def disallow():
-    i = request.json["id"]
-    return mutate(lambda: state.update(exceptions=[e for e in state["exceptions"] if e["id"] != i]))
-
-
-if __name__ == "__main__":
-    if not APP_PASS:
-        raise SystemExit("Όρισε APP_PASS (ο κωδικός του app).")
-    load()
-    threading.Thread(target=housekeeping, daemon=True).start()
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+        return
