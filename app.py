@@ -115,4 +115,36 @@ def clients():
         j = requests.get(f"{ADGUARD_URL}/control/clients", auth=ADGUARD_AUTH, timeout=10).json()
         names = [c["name"] for c in j.get("clients") or []]
         names += [c.get("name") or c["ip"] for c in j.get("auto_clients") or []]
-        return
+        return sorted(set(names))
+    except Exception:
+        return []
+
+
+@app.get("/api/state")
+def get_state():
+    with lock:
+        return jsonify(state=state, presets=PRESETS, clients=clients(), now=time.time())
+
+
+def mutate(fn):
+    with lock:
+        fn()
+        save()
+        try:
+            push()
+            return jsonify(ok=True)
+        except Exception as exc:
+            return jsonify(ok=False, error=f"Δεν μίλησα με το AdGuard Home: {exc}"), 502
+
+
+@app.post("/api/block")
+def block():
+    j = request.json
+    domains = PRESETS.get(j.get("preset")) or [clean_domain(j.get("domain", ""))]
+    if not all(domains):
+        return jsonify(ok=False, error="Μη έγκυρο domain"), 400
+    def f():
+        have = {b["domain"] for b in state["blocked"]}
+        for d in domains:
+            if d not in have:
+                state["blocked"].append
